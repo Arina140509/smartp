@@ -25,11 +25,11 @@ const props = defineProps<{
 }>();
 
 const getColor = (rate: number) => {
-  if (rate >= 80) return '#4caf50';
-  if (rate >= 60) return '#8bc34a';
-  if (rate >= 40) return '#ffc107';
-  if (rate >= 20) return '#ff9800';
-  return '#f44336';
+  if (rate >= 80) return '#0542b3';
+  if (rate >= 60) return '#1251c7';
+  if (rate >= 40) return '#3e76de';
+  if (rate >= 20) return '#568cf0';
+  return '#83aaf2';
 };
 </script>
 

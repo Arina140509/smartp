@@ -60,12 +60,47 @@
               />
             </v-col>
           </v-row>
+
+          <!-- Статус задачи -->
+          <v-select
+            v-if="event"
+            v-model="formData.status"
+            label="Статус"
+            :items="statusOptions"
+            item-title="text"
+            item-value="value"
+          />
         </v-form>
       </v-card-text>
 
       <v-card-actions>
         <v-spacer />
+
+        <!-- Кнопка удаления (только для существующих задач) -->
+        <v-btn
+          v-if="event"
+          color="error"
+          variant="text"
+          @click="handleDelete"
+          :loading="deleting"
+        >
+          <v-icon left>mdi-delete</v-icon>
+          Удалить
+        </v-btn>
+
         <v-btn color="grey" @click="close">Отмена</v-btn>
+
+        <!-- Кнопка выполнения (только для невыполненных задач) -->
+        <v-btn
+          v-if="event && event.status !== 'completed'"
+          color="success"
+          @click="handleComplete"
+          :loading="completing"
+        >
+          <v-icon left>mdi-check</v-icon>
+          Выполнено
+        </v-btn>
+
         <v-btn color="primary" @click="save" :disabled="!valid" :loading="saving">
           Сохранить
         </v-btn>
@@ -86,11 +121,15 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void;
   (e: 'save', event: Partial<Event>): void;
+  (e: 'delete', id: string): void;
+  (e: 'complete', id: string): void;
 }>();
 
 const dialogVisible = ref(props.visible);
 const valid = ref(false);
 const saving = ref(false);
+const completing = ref(false);
+const deleting = ref(false);
 const form = ref();
 
 const priorityOptions = [
@@ -99,7 +138,11 @@ const priorityOptions = [
   { text: 'Высокий', value: 'high' }
 ];
 
-// Функция для преобразования ISO в локальный формат для input
+const statusOptions = [
+  { text: 'В процессе', value: 'pending' },
+  { text: 'Выполнено', value: 'completed' }
+];
+
 const toLocalDateTime = (isoString: string) => {
   if (!isoString) return '';
   const date = new Date(isoString);
@@ -111,7 +154,6 @@ const toLocalDateTime = (isoString: string) => {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 
-// Функция для преобразования локального формата в ISO
 const fromLocalDateTime = (localString: string) => {
   if (!localString) return '';
   const date = new Date(localString);
@@ -126,14 +168,14 @@ const formData = ref({
   start_time_local: '',
   end_time_local: '',
   priority: 'medium' as 'low' | 'medium' | 'high',
-  estimated_duration: 30
+  estimated_duration: 30,
+  status: 'pending' as 'pending' | 'completed'
 });
 
 const updateStartTime = (val: string) => {
   formData.value.start_time = fromLocalDateTime(val);
   formData.value.start_time_local = val;
 
-  // Если время окончания меньше времени начала, увеличиваем его
   if (formData.value.end_time && new Date(formData.value.end_time) <= new Date(formData.value.start_time)) {
     const newEnd = new Date(formData.value.start_time);
     newEnd.setHours(newEnd.getHours() + 1);
@@ -150,7 +192,6 @@ const updateEndTime = (val: string) => {
 watch(() => props.visible, (val) => {
   dialogVisible.value = val;
   if (val && props.event) {
-    // Редактирование
     formData.value = {
       title: props.event.title,
       description: props.event.description || '',
@@ -159,12 +200,11 @@ watch(() => props.visible, (val) => {
       start_time_local: toLocalDateTime(props.event.start_time),
       end_time_local: toLocalDateTime(props.event.end_time),
       priority: props.event.priority,
-      estimated_duration: props.event.estimated_duration || 30
+      estimated_duration: props.event.estimated_duration || 30,
+      status: props.event.status
     };
   } else if (val) {
-    // Новая задача
     const now = new Date();
-    // Округляем до ближайшего получаса
     now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0);
     const start = now;
     const end = new Date(now.getTime() + 60 * 60 * 1000);
@@ -177,7 +217,8 @@ watch(() => props.visible, (val) => {
       start_time_local: toLocalDateTime(start.toISOString()),
       end_time_local: toLocalDateTime(end.toISOString()),
       priority: 'medium',
-      estimated_duration: 60
+      estimated_duration: 60,
+      status: 'pending'
     };
   }
 });
@@ -212,10 +253,9 @@ const save = async () => {
     start_time: formData.value.start_time,
     end_time: formData.value.end_time,
     priority: formData.value.priority,
-    estimated_duration: formData.value.estimated_duration
+    estimated_duration: formData.value.estimated_duration,
+    status: formData.value.status
   };
-
-  console.log('Sending event:', eventData);
 
   try {
     emit('save', eventData);
@@ -225,6 +265,39 @@ const save = async () => {
     alert('Ошибка при сохранении');
   } finally {
     saving.value = false;
+  }
+};
+
+const handleComplete = async () => {
+  if (!props.event?.id) return;
+
+  completing.value = true;
+  try {
+    emit('complete', props.event.id);
+    close();
+  } catch (error) {
+    console.error('Error completing task:', error);
+    alert('Ошибка при отметке выполнения');
+  } finally {
+    completing.value = false;
+  }
+};
+
+const handleDelete = async () => {
+  if (!props.event?.id) return;
+
+  const confirmed = confirm('Вы уверены, что хотите удалить эту задачу?');
+  if (!confirmed) return;
+
+  deleting.value = true;
+  try {
+    emit('delete', props.event.id);
+    close();
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    alert('Ошибка при удалении задачи');
+  } finally {
+    deleting.value = false;
   }
 };
 </script>

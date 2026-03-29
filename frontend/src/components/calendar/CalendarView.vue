@@ -5,7 +5,8 @@
         <v-icon left>mdi-clock-outline</v-icon>
         Добавить занятое время
       </v-btn>
-       <v-btn
+
+      <v-btn
         color="secondary"
         @click="showScheduler = true"
         :disabled="eventsStore.pendingTasks.length === 0"
@@ -20,6 +21,7 @@
         />
       </v-btn>
     </div>
+
     <div class="calendar-wrapper">
       <FullCalendar
         ref="calendarRef"
@@ -31,6 +33,8 @@
       v-model:visible="showEventModal"
       :event="selectedEvent"
       @save="handleSaveEvent"
+      @delete="handleDeleteEvent"
+      @complete="handleCompleteEvent"
     />
 
     <SlotModal
@@ -38,54 +42,16 @@
       :slot="selectedSlot"
       @save="handleSaveSlot"
     />
+
     <SuggestionPanel
       v-model="showScheduler"
       :tasks="eventsStore.pendingTasks"
       @apply="handleScheduleApplied"
     />
-
   </div>
 </template>
 
 <script setup lang="ts">
-import SlotModal from './SlotModal.vue';
-import SuggestionPanel from '@/components/scheduler/SuggestionPanel.vue';
-
-// Добавь ref
-const showScheduler = ref(false);
-
-// Добавь функцию
-const handleScheduleApplied = async () => {
-  const calendarApi = calendarRef.value?.getApi();
-  if (calendarApi) {
-    await calendarApi.refetchEvents();
-  }
-};
-
-// Добавь в ref
-const showSlotModal = ref(false);
-const selectedSlot = ref(null);
-
-// Добавь функцию
-async function handleSaveSlot(slotData: Partial<TimeSlot>) {
-  console.log('Saving slot:', slotData);
-
-  let result;
-  if (slotData.id) {
-    result = await eventsStore.updateSlot(slotData.id, slotData);
-  } else {
-    result = await eventsStore.createSlot(slotData);
-  }
-
-  if (result.success) {
-    const calendarApi = calendarRef.value?.getApi();
-    if (calendarApi) {
-      await calendarApi.refetchEvents();
-    }
-  } else {
-    alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-  }
-}
 import { ref, onMounted } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -93,12 +59,30 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useEventsStore } from '@/stores/events';
 import EventModal from './EventModal.vue';
-import type { Event } from '@/types';
+import SlotModal from './SlotModal.vue';
+import SuggestionPanel from '@/components/scheduler/SuggestionPanel.vue';
+import type { Event, TimeSlot } from '@/types';
 
 const eventsStore = useEventsStore();
 const calendarRef = ref();
 const showEventModal = ref(false);
+const showSlotModal = ref(false);
+const showScheduler = ref(false);
 const selectedEvent = ref<Event | null>(null);
+const selectedSlot = ref<TimeSlot | null>(null);
+
+const getEventColor = (event: Event) => {
+  if (event.status === 'completed') {
+    return '#9e9e9e';
+  }
+
+  switch(event.priority) {
+    case 'high': return '#f44336';
+    case 'medium': return '#ff9800';
+    case 'low': return '#4caf50';
+    default: return '#2196f3';
+  }
+};
 
 const getPriorityColor = (priority: string) => {
   switch(priority) {
@@ -122,10 +106,10 @@ const calendarOptions = {
       await eventsStore.fetchEvents(fetchInfo.start, fetchInfo.end);
       const formattedEvents = eventsStore.events.map(event => ({
         id: event.id,
-        title: event.title,
+        title: event.status === 'completed' ? `✓ ${event.title}` : event.title,
         start: event.start_time,
         end: event.end_time,
-        backgroundColor: getPriorityColor(event.priority),
+        backgroundColor: getEventColor(event),
         extendedProps: {
           description: event.description,
           priority: event.priority,
@@ -147,7 +131,7 @@ const calendarOptions = {
   allDaySlot: false,
   nowIndicator: true,
 
-  dateClick: () => {
+  dateClick: (info: any) => {
     selectedEvent.value = null;
     showEventModal.value = true;
   },
@@ -180,7 +164,7 @@ const calendarOptions = {
     calendarRef.value?.getApi().refetchEvents();
   },
 
-  select: () => {
+  select: (info: any) => {
     selectedEvent.value = null;
     showEventModal.value = true;
   }
@@ -199,22 +183,79 @@ async function handleSaveEvent(eventData: Partial<Event>) {
   console.log('Save result:', result);
 
   if (result.success) {
-    // Обновляем календарь
     const calendarApi = calendarRef.value?.getApi();
     if (calendarApi) {
       await calendarApi.refetchEvents();
     }
   } else {
-    console.error('Failed to save:', result.error);
     alert('Ошибка при сохранении: ' + (result.error || 'Неизвестная ошибка'));
   }
 }
+
+async function handleDeleteEvent(id: string) {
+  console.log('Deleting event:', id);
+
+  const result = await eventsStore.deleteEvent(id);
+
+  if (result.success) {
+    const calendarApi = calendarRef.value?.getApi();
+    if (calendarApi) {
+      await calendarApi.refetchEvents();
+    }
+  } else {
+    alert('Ошибка при удалении: ' + (result.error || 'Неизвестная ошибка'));
+  }
+}
+
+async function handleCompleteEvent(id: string) {
+  console.log('Completing event:', id);
+
+  const result = await eventsStore.completeEvent(id);
+
+  if (result.success) {
+    const calendarApi = calendarRef.value?.getApi();
+    if (calendarApi) {
+      await calendarApi.refetchEvents();
+    }
+    alert('Задача отмечена как выполненная! 🎉');
+  } else {
+    alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+  }
+}
+
+async function handleSaveSlot(slotData: Partial<TimeSlot>) {
+  console.log('Saving slot:', slotData);
+
+  let result;
+  if (slotData.id) {
+    result = await eventsStore.updateSlot(slotData.id, slotData);
+  } else {
+    result = await eventsStore.createSlot(slotData);
+  }
+
+  if (result.success) {
+    const calendarApi = calendarRef.value?.getApi();
+    if (calendarApi) {
+      await calendarApi.refetchEvents();
+    }
+  } else {
+    alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+  }
+}
+
+const handleScheduleApplied = async () => {
+  const calendarApi = calendarRef.value?.getApi();
+  if (calendarApi) {
+    await calendarApi.refetchEvents();
+  }
+};
 
 onMounted(async () => {
   const now = new Date();
   const start = new Date(now.setDate(now.getDate() - 7));
   const end = new Date(now.setDate(now.getDate() + 14));
   await eventsStore.fetchEvents(start, end);
+  await eventsStore.fetchBusySlots(start, end);
 });
 </script>
 
@@ -223,12 +264,15 @@ onMounted(async () => {
   height: calc(100vh - 64px);
   padding: 20px;
 }
+
 .calendar-toolbar {
   margin-bottom: 16px;
+  display: flex;
+  gap: 12px;
 }
 
 .calendar-wrapper {
-  height: 100%;
+  height: calc(100% - 56px);
 }
 
 :deep(.fc) {

@@ -79,6 +79,12 @@ const getPriorityIcon = (priority: string) => {
     default: return 'mdi-calendar';
   }
 };
+const props = defineProps<{
+  tasks: Event[];
+}>();
+const pendingTasks = computed(() =>
+  props.tasks.filter(task => task.status !== 'completed')
+);
 </script>
 
 <style scoped>
@@ -94,14 +100,14 @@ const getPriorityIcon = (priority: string) => {
 }
 
 .priority-high {
-  border-left: 4px solid #f44336;
+  border-left: 4px solid #0542b3;
 }
 
 .priority-medium {
-  border-left: 4px solid #ff9800;
+  border-left: 4px solid #3e76de;
 }
 
 .priority-low {
-  border-left: 4px solid #4caf50;
+  border-left: 4px solid #83aaf2;
 }
 </style>

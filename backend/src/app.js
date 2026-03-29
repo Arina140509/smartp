@@ -9,6 +9,7 @@ const authRoutes = require('./routes/auth');
 const eventRoutes = require('./routes/events');
 const slotRoutes = require('./routes/slots');
 const statsRoutes = require('./routes/stats');
+const aiRoutes = require('./routes/ai');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -24,6 +25,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

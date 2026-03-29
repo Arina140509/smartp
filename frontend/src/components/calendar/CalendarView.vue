@@ -1,5 +1,25 @@
 <template>
   <div class="calendar-container">
+    <div class="calendar-toolbar">
+      <v-btn color="primary" @click="showSlotModal = true">
+        <v-icon left>mdi-clock-outline</v-icon>
+        Добавить занятое время
+      </v-btn>
+       <v-btn
+        color="secondary"
+        @click="showScheduler = true"
+        :disabled="eventsStore.pendingTasks.length === 0"
+      >
+        <v-icon left>mdi-brain</v-icon>
+        Умный планировщик
+        <v-badge
+          v-if="eventsStore.pendingTasks.length > 0"
+          :content="eventsStore.pendingTasks.length"
+          color="error"
+          floating
+        />
+      </v-btn>
+    </div>
     <div class="calendar-wrapper">
       <FullCalendar
         ref="calendarRef"
@@ -12,10 +32,60 @@
       :event="selectedEvent"
       @save="handleSaveEvent"
     />
+
+    <SlotModal
+      v-model:visible="showSlotModal"
+      :slot="selectedSlot"
+      @save="handleSaveSlot"
+    />
+    <SuggestionPanel
+      v-model="showScheduler"
+      :tasks="eventsStore.pendingTasks"
+      @apply="handleScheduleApplied"
+    />
+
   </div>
 </template>
 
 <script setup lang="ts">
+import SlotModal from './SlotModal.vue';
+import SuggestionPanel from '@/components/scheduler/SuggestionPanel.vue';
+
+// Добавь ref
+const showScheduler = ref(false);
+
+// Добавь функцию
+const handleScheduleApplied = async () => {
+  const calendarApi = calendarRef.value?.getApi();
+  if (calendarApi) {
+    await calendarApi.refetchEvents();
+  }
+};
+
+// Добавь в ref
+const showSlotModal = ref(false);
+const selectedSlot = ref(null);
+
+// Добавь функцию
+async function handleSaveSlot(slotData: Partial<TimeSlot>) {
+  console.log('Saving slot:', slotData);
+
+  let result;
+  if (slotData.id) {
+    result = await eventsStore.updateSlot(slotData.id, slotData);
+  } else {
+    result = await eventsStore.createSlot(slotData);
+  }
+
+  if (result.success) {
+    const calendarApi = calendarRef.value?.getApi();
+    if (calendarApi) {
+      await calendarApi.refetchEvents();
+    }
+  } else {
+    alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
+  }
+}
 import { ref, onMounted } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
@@ -77,7 +147,7 @@ const calendarOptions = {
   allDaySlot: false,
   nowIndicator: true,
 
-  dateClick: (info: any) => {
+  dateClick: () => {
     selectedEvent.value = null;
     showEventModal.value = true;
   },
@@ -110,7 +180,7 @@ const calendarOptions = {
     calendarRef.value?.getApi().refetchEvents();
   },
 
-  select: (info: any) => {
+  select: () => {
     selectedEvent.value = null;
     showEventModal.value = true;
   }
@@ -152,6 +222,9 @@ onMounted(async () => {
 .calendar-container {
   height: calc(100vh - 64px);
   padding: 20px;
+}
+.calendar-toolbar {
+  margin-bottom: 16px;
 }
 
 .calendar-wrapper {

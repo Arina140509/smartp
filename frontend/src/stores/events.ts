@@ -111,25 +111,36 @@ export const useEventsStore = defineStore('events', () => {
   };
 
   const createSlot = async (slotData: Partial<TimeSlot>) => {
-    try {
-      const response = await slotsApi.create(slotData);
-      busySlots.value.push(response.data);
-      return { success: true, slot: response.data };
-    } catch (error: any) {
-      return { success: false, error: error.response?.data?.error };
-    }
-  };
+  try {
+    const response = await slotsApi.create(slotData);
+    busySlots.value.push(response.data);
+    return { success: true, slot: response.data };
+  } catch (error: any) {
+    console.error('Create slot error:', error);
+    return { success: false, error: error.response?.data?.error || 'Ошибка создания' };
+  }
+};
 
-  const deleteSlot = async (id: string) => {
-    try {
-      await slotsApi.delete(id);
-      busySlots.value = busySlots.value.filter(s => s.id !== id);
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.response?.data?.error };
-    }
-  };
+const updateSlot = async (id: string, slotData: Partial<TimeSlot>) => {
+  try {
+    const response = await slotsApi.update(id, slotData);
+    const index = busySlots.value.findIndex(s => s.id === id);
+    if (index !== -1) busySlots.value[index] = response.data;
+    return { success: true, slot: response.data };
+  } catch (error: any) {
+    return { success: false, error: error.response?.data?.error };
+  }
+};
 
+const deleteSlot = async (id: string) => {
+  try {
+    await slotsApi.delete(id);
+    busySlots.value = busySlots.value.filter(s => s.id !== id);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.response?.data?.error };
+  }
+};
   return {
     events,
     busySlots,
@@ -145,6 +156,7 @@ export const useEventsStore = defineStore('events', () => {
     deleteEvent,
     completeEvent,
     createSlot,
+    updateSlot,
     deleteSlot
   };
 });

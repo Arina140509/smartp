@@ -9,14 +9,24 @@ const authRoutes = require('./routes/auth');
 const eventRoutes = require('./routes/events');
 const slotRoutes = require('./routes/slots');
 const statsRoutes = require('./routes/stats');
-const aiRoutes = require('./routes/ai');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// Middleware
+// CORS настройки
+app.use(cors({
+  origin: [
+    'https://planner-frontend-t8v4.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Другие middleware
 app.use(helmet());
-app.use(cors());
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -25,7 +35,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/slots', slotRoutes);
 app.use('/api/stats', statsRoutes);
-app.use('/api/ai', aiRoutes);
 
 // Health check
 app.get('/health', (req, res) => {

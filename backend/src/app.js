@@ -13,14 +13,9 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// CORS настройки
+// CORS настройки - разрешаем все для теста
 app.use(cors({
-  origin: [
-    'https://planner-frontend-t8v4.onrender.com',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ],
-  credentials: true,
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));

@@ -12,25 +12,30 @@
 
       <v-card-text>
         <v-alert v-if="loading" type="info" class="mb-4">
+          <v-progress-circular indeterminate size="20" class="mr-2" />
           Анализирую ваше расписание...
         </v-alert>
 
-        <v-alert v-if="hasPastTasks" type="warning" class="mb-4">
+        <v-alert v-if="hasPastTasks" type="warning" class="mb-4" closable>
           <strong>⚠️ Внимание!</strong> У вас есть задачи, которые уже должны были быть выполнены.<br>
           Планировщик распределит их на ближайшее свободное время.
         </v-alert>
 
         <v-alert v-if="debugInfo" type="info" class="mb-4" variant="tonal">
           <strong>📊 Информация о расписании:</strong><br>
-          Задач для распределения: {{ tasks.length }}<br>
-          Занятых слотов: {{ eventsStore.busySlots.length }}<br>
-          Найдено свободных слотов на сегодня: {{ todayFreeSlotsCount }}
+          Задач для распределения: <strong>{{ tasks.length }}</strong><br>
+          Занятых слотов: <strong>{{ eventsStore.busySlots.length }}</strong><br>
+          Рабочее время: <strong>{{ workStart }}:00 — {{ workEnd }}:00</strong><br>
+          Свободных слотов на сегодня: <strong>{{ todayFreeSlotsCount }}</strong>
         </v-alert>
 
         <template v-if="scheduledTasks.length > 0 || unscheduledTasks.length > 0">
           <!-- Распределенные задачи -->
           <div v-if="scheduledTasks.length > 0">
-            <h3 class="text-h6 mb-2">✅ Распределенные задачи ({{ scheduledTasks.length }})</h3>
+            <h3 class="text-h6 mb-2">
+              ✅ Распределенные задачи
+              <v-chip size="small" color="success" class="ml-2">{{ scheduledTasks.length }}</v-chip>
+            </h3>
             <v-list>
               <v-list-item
                 v-for="task in scheduledTasks"
@@ -38,14 +43,16 @@
                 :class="`priority-${task.priority}`"
               >
                 <template v-slot:prepend>
-                  <v-icon :color="getPriorityColor(task.priority)">
+                  <v-icon :color="getPriorityColor(task.priority)" size="24">
                     {{ getPriorityIcon(task.priority) }}
                   </v-icon>
                 </template>
 
-                <v-list-item-title>{{ task.title }}</v-list-item-title>
+                <v-list-item-title class="font-weight-medium">
+                  {{ task.title }}
+                </v-list-item-title>
                 <v-list-item-subtitle>
-                  {{ formatDate(task.scheduled_start) }} {{ formatTime(task.scheduled_start) }}–{{ formatTime(task.scheduled_end) }}
+                  🕒 {{ formatDate(task.scheduled_start) }} {{ formatTime(task.scheduled_start) }} – {{ formatTime(task.scheduled_end) }}
                   ({{ getDuration(task.scheduled_start, task.scheduled_end) }} мин)
                 </v-list-item-subtitle>
 
@@ -54,7 +61,9 @@
                     icon
                     size="small"
                     color="success"
+                    variant="tonal"
                     @click="applyTask(task)"
+                    title="Применить"
                   >
                     <v-icon>mdi-check</v-icon>
                   </v-btn>
@@ -65,7 +74,10 @@
 
           <!-- Нераспределенные задачи -->
           <div v-if="unscheduledTasks.length > 0" class="mt-4">
-            <h3 class="text-h6 mb-2">⚠️ Нераспределенные задачи ({{ unscheduledTasks.length }})</h3>
+            <h3 class="text-h6 mb-2">
+              ⚠️ Нераспределенные задачи
+              <v-chip size="small" color="warning" class="ml-2">{{ unscheduledTasks.length }}</v-chip>
+            </h3>
             <v-list>
               <v-list-item
                 v-for="task in unscheduledTasks"
@@ -73,12 +85,14 @@
                 :class="`priority-${task.priority}`"
               >
                 <template v-slot:prepend>
-                  <v-icon :color="getPriorityColor(task.priority)">
+                  <v-icon :color="getPriorityColor(task.priority)" size="24">
                     {{ getPriorityIcon(task.priority) }}
                   </v-icon>
                 </template>
 
-                <v-list-item-title>{{ task.title }}</v-list-item-title>
+                <v-list-item-title class="font-weight-medium">
+                  {{ task.title }}
+                </v-list-item-title>
                 <v-list-item-subtitle>
                   ⏰ {{ task.estimated_duration || 30 }} мин •
                   Не хватает свободного времени в ближайшие 7 дней
@@ -87,30 +101,43 @@
             </v-list>
           </div>
 
-          <v-btn
-            v-if="scheduledTasks.length > 0"
-            color="primary"
-            block
-            class="mt-4"
-            @click="applyAll"
-          >
-            Применить все ({{ scheduledTasks.length }}) задач
-          </v-btn>
+          <div class="mt-6">
+            <v-btn
+              v-if="scheduledTasks.length > 0"
+              color="primary"
+              block
+              size="large"
+              @click="applyAll"
+              :loading="applyingAll"
+            >
+              <v-icon left>mdi-check-all</v-icon>
+              Применить все ({{ scheduledTasks.length }}) задач
+            </v-btn>
+          </div>
         </template>
 
-        <v-alert v-else-if="!loading" type="info">
+        <v-alert v-else-if="!loading && tasks.length === 0" type="info" class="mt-4">
           <strong>📭 Нет задач для распределения</strong><br>
-          Создайте новые задачи или отметьте существующие как "в процессе".
+          Создайте новые задачи, чтобы получить предложения по расписанию.
         </v-alert>
 
-        <v-alert v-if="scheduledTasks.length === 0 && unscheduledTasks.length === 0 && tasks.length > 0 && !loading" type="warning" class="mt-4">
-          <strong>⚠️ Не удалось найти свободное время</strong><br>
-          Проверьте:
+        <v-alert v-else-if="!loading && scheduledTasks.length === 0 && unscheduledTasks.length === 0 && tasks.length > 0" type="warning" class="mt-4">
+          <strong>⚠️ Не удалось найти свободное время для задач</strong><br>
+          Возможные причины:
           <ul class="mt-2">
-            <li>Есть ли у вас свободные слоты в календаре?</li>
-            <li>Не добавлены ли занятые слоты на всё время?</li>
-            <li>Возможно, все задачи уже распределены</li>
+            <li>Нет свободных слотов в рабочее время</li>
+            <li>Все слоты заняты встречами или другими делами</li>
+            <li>Задачи слишком длинные для доступных промежутков</li>
           </ul>
+          <v-btn
+            variant="text"
+            color="primary"
+            size="small"
+            class="mt-2"
+            @click="debugInfo = !debugInfo"
+          >
+            {{ debugInfo ? 'Скрыть' : 'Показать' }} детальную информацию
+          </v-btn>
         </v-alert>
       </v-card-text>
     </v-card>
@@ -140,15 +167,19 @@ const eventsStore = useEventsStore();
 const authStore = useAuthStore();
 
 const loading = ref(false);
+const applyingAll = ref(false);
 const scheduledTasks = ref<any[]>([]);
 const unscheduledTasks = ref<Event[]>([]);
+const debugInfo = ref(true);
+
+// Получаем рабочие часы из настроек
+const workStart = computed(() => authStore.user?.working_hours_start ?? 9);
+const workEnd = computed(() => authStore.user?.working_hours_end ?? 21);
 
 // Подсчет свободных слотов на сегодня для отладки
 const todayFreeSlotsCount = computed(() => {
   const now = new Date();
-  const workStart = authStore.user?.working_hours_start || 9;
-  const workEnd = authStore.user?.working_hours_end || 21;
-  const slots = scheduler.findFreeSlots(eventsStore.busySlots, now, workStart, workEnd);
+  const slots = scheduler.findFreeSlots(eventsStore.busySlots, now, workStart.value, workEnd.value);
   return slots.length;
 });
 
@@ -159,8 +190,6 @@ const hasPastTasks = computed(() => {
     return isBefore(taskStart, now);
   });
 });
-
-const debugInfo = ref(true);
 
 watch(() => props.modelValue, (val) => {
   drawer.value = val;
@@ -176,26 +205,35 @@ watch(drawer, (val) => {
 const generateSchedule = async () => {
   if (props.tasks.length === 0) {
     console.log('Нет задач для распределения');
+    scheduledTasks.value = [];
+    unscheduledTasks.value = [];
     return;
   }
 
   loading.value = true;
 
   const startDate = new Date();
-  const workStart = authStore.user?.working_hours_start || 9;
-  const workEnd = authStore.user?.working_hours_end || 21;
 
   console.log('=== НАЧАЛО ПЛАНИРОВАНИЯ ===');
-  console.log('Задачи:', props.tasks.map(t => ({ title: t.title, priority: t.priority, duration: t.estimated_duration })));
-  console.log('Занятые слоты:', eventsStore.busySlots.map(s => ({ title: s.title, start: s.start_time, end: s.end_time })));
-  console.log('Рабочие часы:', workStart, '-', workEnd);
+  console.log('Задачи:', props.tasks.map(t => ({
+    title: t.title,
+    priority: t.priority,
+    duration: t.estimated_duration,
+    start_time: t.start_time
+  })));
+  console.log('Занятые слоты:', eventsStore.busySlots.map(s => ({
+    title: s.title,
+    start: s.start_time,
+    end: s.end_time
+  })));
+  console.log('Рабочие часы:', workStart.value, '-', workEnd.value);
 
   const result = scheduler.quickSchedule(
     props.tasks,
     eventsStore.busySlots,
     startDate,
-    workStart,
-    workEnd,
+    workStart.value,
+    workEnd.value,
     7
   );
 
@@ -241,26 +279,48 @@ const getPriorityIcon = (priority: string) => {
 };
 
 const applyTask = async (task: any) => {
-  await eventsStore.updateEvent(task.id, {
+  const result = await eventsStore.updateEvent(task.id, {
     start_time: task.scheduled_start.toISOString(),
     end_time: task.scheduled_end.toISOString()
   });
 
-  scheduledTasks.value = scheduledTasks.value.filter(t => t.id !== task.id);
+  if (result.success) {
+    scheduledTasks.value = scheduledTasks.value.filter(t => t.id !== task.id);
 
-  // Обновляем календарь
-  const calendarApi = (window as any).calendarApi;
-  if (calendarApi) {
-    await calendarApi.refetchEvents();
+    // Обновляем календарь
+    const calendarApi = (window as any).calendarApi;
+    if (calendarApi) {
+      await calendarApi.refetchEvents();
+    }
+  } else {
+    alert('Ошибка при применении: ' + result.error);
   }
 };
 
 const applyAll = async () => {
+  applyingAll.value = true;
+
+  let successCount = 0;
+  let errorCount = 0;
+
   for (const task of scheduledTasks.value) {
-    await eventsStore.updateEvent(task.id, {
+    const result = await eventsStore.updateEvent(task.id, {
       start_time: task.scheduled_start.toISOString(),
       end_time: task.scheduled_end.toISOString()
     });
+
+    if (result.success) {
+      successCount++;
+    } else {
+      errorCount++;
+      console.error('Ошибка при применении задачи:', task.id, result.error);
+    }
+  }
+
+  if (errorCount > 0) {
+    alert(`Применено ${successCount} задач, ${errorCount} с ошибками`);
+  } else if (successCount > 0) {
+    alert(`✅ Успешно применено ${successCount} задач!`);
   }
 
   scheduledTasks.value = [];
@@ -271,6 +331,11 @@ const applyAll = async () => {
   if (calendarApi) {
     await calendarApi.refetchEvents();
   }
+
+  applyingAll.value = false;
+
+  // Закрываем панель
+  drawer.value = false;
 };
 </script>
 
@@ -281,13 +346,33 @@ const applyAll = async () => {
 
 .priority-high {
   border-left: 4px solid #f44336;
+  background-color: rgba(244, 67, 54, 0.05);
 }
 
 .priority-medium {
   border-left: 4px solid #ff9800;
+  background-color: rgba(255, 152, 0, 0.05);
 }
 
 .priority-low {
   border-left: 4px solid #4caf50;
+  background-color: rgba(76, 175, 80, 0.05);
+}
+
+:deep(.v-list-item) {
+  margin-bottom: 4px;
+  border-radius: 8px;
+}
+
+:deep(.v-list-item__prepend) {
+  margin-right: 12px;
+}
+
+:deep(.v-list-item-title) {
+  font-size: 0.95rem;
+}
+
+:deep(.v-list-item-subtitle) {
+  font-size: 0.8rem;
 }
 </style>

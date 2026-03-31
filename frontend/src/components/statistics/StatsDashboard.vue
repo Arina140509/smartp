@@ -7,6 +7,7 @@
     </v-row>
 
     <template v-else-if="stats">
+      <!-- Основные метрики -->
       <v-row>
         <v-col cols="12" md="3">
           <v-card>
@@ -55,6 +56,7 @@
         </v-col>
       </v-row>
 
+      <!-- Динамика выполнения -->
       <v-row>
         <v-col cols="12" md="8">
           <v-card>
@@ -65,6 +67,7 @@
           </v-card>
         </v-col>
 
+        <!-- Статистика по приоритетам -->
         <v-col cols="12" md="4">
           <v-card>
             <v-card-title>Приоритеты задач</v-card-title>
@@ -91,30 +94,77 @@
         </v-col>
       </v-row>
 
-      <v-row>
+      <!-- Дополнительная статистика -->
+      <v-row class="mt-4">
         <v-col cols="12">
           <v-card>
-            <v-card-title>Продуктивность по часам</v-card-title>
+            <v-card-title>Общая статистика</v-card-title>
             <v-card-text>
-              <ProductivityHeatmap :data="stats.hourlyProductivity" />
+              <v-row>
+                <v-col cols="12" md="4">
+                  <div class="text-center pa-4">
+                    <div class="text-h4">{{ totalDays }} дн.</div>
+                    <div class="text-caption">Период анализа</div>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-center pa-4">
+                    <div class="text-h4">{{ avgTasksPerDay }}</div>
+                    <div class="text-caption">Выполненных задач в день в среднем</div>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-center pa-4">
+                    <div class="text-h4">{{ bestDay }}</div>
+                    <div class="text-caption">Cамый продуктивный день</div>
+                  </div>
+                </v-col>
+              </v-row>
             </v-card-text>
           </v-card>
         </v-col>
       </v-row>
     </template>
+
+    <v-row v-else>
+      <v-col cols="12">
+        <v-alert type="info">
+          Нет данных для отображения. Создайте задачи, чтобы увидеть статистику.
+        </v-alert>
+      </v-col>
+    </v-row>
   </v-container>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted } from 'vue';
 import { useStatsStore } from '@/stores/stats';
 import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
 import CompletionChart from './CompletionChart.vue';
-import ProductivityHeatmap from './ProductivityHeatmap.vue';
 
 const statsStore = useStatsStore();
 const stats = statsStore.stats;
 const loading = statsStore.loading;
+
+// Дополнительные вычисляемые метрики
+const totalDays = computed(() => {
+  if (!stats?.dailyData.length) return 0;
+  return stats.dailyData.length;
+});
+
+const avgTasksPerDay = computed(() => {
+  if (!stats?.dailyData.length) return 0;
+  const totalTasks = stats.dailyData.reduce((sum, day) => sum + day.total, 0);
+  return Math.round(totalTasks / stats.dailyData.length);
+});
+
+const bestDay = computed(() => {
+  if (!stats?.dailyData.length) return '—';
+  const best = [...stats.dailyData].sort((a, b) => b.completed - a.completed)[0];
+  if (!best || best.completed === 0) return '—';
+  const date = new Date(best.date);
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+});
 
 const getPriorityName = (priority: string) => {
   switch(priority) {

@@ -97,16 +97,20 @@ exports.updateSettings = async (req, res) => {
       working_hours_end
     });
 
+    // Возвращаем обновленного пользователя
+    const updatedUser = await User.findByPk(req.user.id);
+
     res.json({
       user: {
-        id: req.user.id,
-        name: req.user.name,
-        email: req.user.email,
-        working_hours_start: req.user.working_hours_start,
-        working_hours_end: req.user.working_hours_end
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        working_hours_start: updatedUser.working_hours_start,
+        working_hours_end: updatedUser.working_hours_end
       }
     });
   } catch (error) {
+    console.error('Update settings error:', error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -1,7 +1,6 @@
 <template>
   <div class="calendar-container">
     <div class="calendar-toolbar">
-
       <v-btn
         color="secondary"
         @click="showScheduler = true"
@@ -35,12 +34,6 @@
       @complete="handleCompleteEvent"
     />
 
-    <SlotModal
-      v-model:visible="showSlotModal"
-      :slot="selectedSlot"
-      @save="handleSaveSlot"
-    />
-
     <SuggestionPanel
       v-model="showScheduler"
       :tasks="eventsStore.pendingTasks"
@@ -50,26 +43,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import ruLocale from '@fullcalendar/core/locales/ru';
 import { useEventsStore } from '@/stores/events';
+import { useAuthStore } from '@/stores/auth';
 import EventModal from './EventModal.vue';
-import SlotModal from './SlotModal.vue';
 import SuggestionPanel from '@/components/scheduler/SuggestionPanel.vue';
-import type { Event, TimeSlot } from '@/types';
+import type { Event } from '@/types';
 
 const eventsStore = useEventsStore();
+const authStore = useAuthStore();
 const calendarRef = ref();
 const showEventModal = ref(false);
-const showSlotModal = ref(false);
 const showScheduler = ref(false);
 const selectedEvent = ref<Event | null>(null);
-const selectedSlot = ref<TimeSlot | null>(null);
 const selectedStartDate = ref<Date | null>(null);
 const selectedEndDate = ref<Date | null>(null);
+
+// Рабочие часы из настроек
+const workStart = computed(() => authStore.user?.working_hours_start ?? 9);
+const workEnd = computed(() => authStore.user?.working_hours_end ?? 21);
 
 const getEventColor = (event: Event) => {
   if (event.status === 'completed') {
@@ -87,6 +84,13 @@ const getEventColor = (event: Event) => {
 const calendarOptions = {
   plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
   initialView: 'timeGridWeek',
+  locale: ruLocale,
+  buttonText: {
+    today: 'Сегодня',
+    month: 'Месяц',
+    week: 'Неделя',
+    day: 'День'
+  },
   headerToolbar: {
     left: 'prev,next today',
     center: 'title',
@@ -117,10 +121,21 @@ const calendarOptions = {
   selectMirror: true,
   dayMaxEvents: true,
   weekends: true,
-  slotMinTime: '08:00:00',
-  slotMaxTime: '22:00:00',
+  slotMinTime: `${workStart.value.toString().padStart(2, '0')}:00:00`,
+  slotMaxTime: `${workEnd.value.toString().padStart(2, '0')}:00:00`,
   allDaySlot: false,
   nowIndicator: true,
+  slotLabelFormat: {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  },
+  titleFormat: {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  },
+  firstDay: 1,
 
   dateClick: (info: any) => {
     const start = info.date;
@@ -167,6 +182,20 @@ const calendarOptions = {
     showEventModal.value = true;
   }
 };
+watch(calendarRef, (ref) => {
+  if (ref?.getApi()) {
+    (window as any).calendarApi = ref.getApi();
+  }
+});
+// Следим за изменением рабочих часов
+watch([workStart, workEnd], () => {
+  const calendarApi = calendarRef.value?.getApi();
+  if (calendarApi) {
+    calendarApi.setOption('slotMinTime', `${workStart.value.toString().padStart(2, '0')}:00:00`);
+    calendarApi.setOption('slotMaxTime', `${workEnd.value.toString().padStart(2, '0')}:00:00`);
+    calendarApi.refetchEvents();
+  }
+});
 
 async function handleSaveEvent(eventData: Partial<Event>) {
   console.log('Saving event:', eventData);
@@ -216,26 +245,6 @@ async function handleCompleteEvent(id: string) {
       await calendarApi.refetchEvents();
     }
     alert('Задача отмечена как выполненная! 🎉');
-  } else {
-    alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
-  }
-}
-
-async function handleSaveSlot(slotData: Partial<TimeSlot>) {
-  console.log('Saving slot:', slotData);
-
-  let result;
-  if (slotData.id) {
-    result = await eventsStore.updateSlot(slotData.id, slotData);
-  } else {
-    result = await eventsStore.createSlot(slotData);
-  }
-
-  if (result.success) {
-    const calendarApi = calendarRef.value?.getApi();
-    if (calendarApi) {
-      await calendarApi.refetchEvents();
-    }
   } else {
     alert('Ошибка: ' + (result.error || 'Неизвестная ошибка'));
   }

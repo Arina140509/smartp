@@ -98,7 +98,7 @@ exports.updateSettings = async (req, res) => {
     });
 
     // Возвращаем обновленного пользователя
-    const updatedUser = await User.findByPk(req.user.id);
+    const updatedUser = await req.user.reload();
 
     res.json({
       user: {

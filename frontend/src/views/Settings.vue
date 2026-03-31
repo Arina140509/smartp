@@ -106,10 +106,6 @@
                 <v-list-item-title>Email</v-list-item-title>
                 <v-list-item-subtitle>{{ authStore.user?.email || '—' }}</v-list-item-subtitle>
               </v-list-item>
-              <v-list-item>
-                <v-list-item-title>Рабочее время</v-list-item-title>
-                <v-list-item-subtitle>{{ workStart }}:00 — {{ workEnd }}:00</v-list-item-subtitle>
-              </v-list-item>
             </v-list>
           </v-card-text>
         </v-card>
@@ -119,13 +115,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useAuthStore } from '@/stores/auth';
-import { useEventsStore } from '@/stores/events';
 import Navbar from '@/components/common/Navbar.vue';
 
 const authStore = useAuthStore();
-const eventsStore = useEventsStore();
 const loading = ref(false);
 const saveSuccess = ref(false);
 const saveError = ref('');
@@ -143,7 +137,15 @@ const formatTime = (hour: number) => {
 };
 
 onMounted(() => {
-  if (authStore.user) {
+  // Загружаем сохраненные настройки из localStorage
+  const savedStart = localStorage.getItem('working_hours_start');
+  const savedEnd = localStorage.getItem('working_hours_end');
+
+  if (savedStart && savedEnd) {
+    workStart.value = parseInt(savedStart);
+    workEnd.value = parseInt(savedEnd);
+  } else if (authStore.user) {
+    // Если нет в localStorage, берем из пользователя
     workStart.value = authStore.user.working_hours_start ?? 9;
     workEnd.value = authStore.user.working_hours_end ?? 21;
   }
@@ -161,30 +163,30 @@ const saveSettings = async () => {
   loading.value = true;
   saveError.value = '';
 
-  const result = await authStore.updateSettings(workStart.value, workEnd.value);
+  // Сохраняем в localStorage
+  localStorage.setItem('working_hours_start', String(workStart.value));
+  localStorage.setItem('working_hours_end', String(workEnd.value));
 
-  if (result.success) {
-    saveSuccess.value = true;
-
-    // Обновляем календарь без перезагрузки страницы
-    // Находим календарь и обновляем его настройки
-    const calendarElement = document.querySelector('.fc');
-    if (calendarElement && (window as any).calendarApi) {
-      const calendarApi = (window as any).calendarApi;
-      calendarApi.setOption('slotMinTime', `${workStart.value.toString().padStart(2, '0')}:00:00`);
-      calendarApi.setOption('slotMaxTime', `${workEnd.value.toString().padStart(2, '0')}:00:00`);
-      calendarApi.refetchEvents();
-    }
-
-    setTimeout(() => {
-      saveSuccess.value = false;
-    }, 3000);
-  } else {
-    saveError.value = result.error || 'Ошибка при сохранении настроек';
-    setTimeout(() => {
-      saveError.value = '';
-    }, 3000);
+  // Обновляем в бэкенде (если нужно)
+  if (authStore.user) {
+    await authStore.updateSettings(workStart.value, workEnd.value);
   }
+
+  // Обновляем календарь через глобальную переменную
+  const calendarApi = (window as any).calendarApi;
+  if (calendarApi) {
+    const startStr = `${workStart.value.toString().padStart(2, '0')}:00:00`;
+    const endStr = `${workEnd.value.toString().padStart(2, '0')}:00:00`;
+    calendarApi.setOption('slotMinTime', startStr);
+    calendarApi.setOption('slotMaxTime', endStr);
+    calendarApi.refetchEvents();
+    console.log('Календарь обновлен:', startStr, '-', endStr);
+  }
+
+  saveSuccess.value = true;
+  setTimeout(() => {
+    saveSuccess.value = false;
+  }, 3000);
 
   loading.value = false;
 };

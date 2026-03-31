@@ -3,7 +3,7 @@
     <v-app-bar-nav-icon @click="drawer = !drawer" />
 
     <v-toolbar-title>
-      <router-link to="/" style="color: white; text-decoration: none;">
+      <router-link to="/" style="color:#276359; text-decoration: none;">
         Планер
       </router-link>
     </v-toolbar-title>

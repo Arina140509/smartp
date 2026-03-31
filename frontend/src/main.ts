@@ -18,13 +18,13 @@ const vuetify = createVuetify({
     themes: {
       light: {
         colors: {
-          primary: '#1976D2',
+          primary: '#B9CDCB',
           secondary: '#424242',
           accent: '#82B1FF',
-          error: '#FF5252',
-          info: '#2196F3',
-          success: '#4CAF50',
-          warning: '#FFC107'
+          error: '#E38150',
+          info: '#A8BBB9',
+          success: '#FCAC89',
+          warning: '#F9DDB8'
         }
       }
     }

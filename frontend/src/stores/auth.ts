@@ -8,7 +8,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'));
   const loading = ref(false);
 
-  const isAuthenticated = computed(() => !!token.value && !!user.value);
+  const isAuthenticated = computed(() => !!token.value);
 
   const login = async (credentials: LoginCredentials) => {
     loading.value = true;
@@ -66,7 +66,10 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = response.data.user;
       return { success: true };
     } catch (error: any) {
-      return { success: false, error: error.response?.data?.error || 'Update failed' };
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Update failed'
+      };
     }
   };
 

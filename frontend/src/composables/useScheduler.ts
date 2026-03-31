@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import { addMinutes, setHours, setMinutes, isBefore, isAfter, startOfDay } from 'date-fns';
+import { addMinutes, setHours, setMinutes } from 'date-fns';
 import type { Event, TimeSlot } from '@/types';
 
 export function useScheduler() {

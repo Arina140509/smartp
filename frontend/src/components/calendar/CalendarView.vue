@@ -1,10 +1,6 @@
 <template>
   <div class="calendar-container">
     <div class="calendar-toolbar">
-      <v-btn color="primary" @click="showSlotModal = true">
-        <v-icon left>mdi-clock-outline</v-icon>
-        Добавить занятое время
-      </v-btn>
 
       <v-btn
         color="secondary"

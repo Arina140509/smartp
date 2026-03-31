@@ -13,15 +13,35 @@ const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
 
-// CORS настройки - разрешаем все для теста
+// CORS настройки - разрешаем запросы с твоего фронтенда
+const allowedOrigins = [
+  'https://planner-frontend-lpmb.onrender.com',
+  'https://planner-frontend-t8v4.onrender.com',
+  'http://localhost:5173',
+  'http://localhost:3000'
+];
+
 app.use(cors({
-  origin: '*',
+  origin: function(origin, callback) {
+    // Разрешаем запросы без origin (например, из Postman)
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Blocked origin:', origin);
+      callback(null, true); // временно разрешаем все для теста
+    }
+  },
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
 
 // Другие middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(express.json());
 app.use(morgan('dev'));
 

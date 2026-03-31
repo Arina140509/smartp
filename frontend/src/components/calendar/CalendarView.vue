@@ -32,6 +32,8 @@
     <EventModal
       v-model:visible="showEventModal"
       :event="selectedEvent"
+      :start-date="selectedStartDate"
+      :end-date="selectedEndDate"
       @save="handleSaveEvent"
       @delete="handleDeleteEvent"
       @complete="handleCompleteEvent"
@@ -70,6 +72,8 @@ const showSlotModal = ref(false);
 const showScheduler = ref(false);
 const selectedEvent = ref<Event | null>(null);
 const selectedSlot = ref<TimeSlot | null>(null);
+const selectedStartDate = ref<Date | null>(null);
+const selectedEndDate = ref<Date | null>(null);
 
 const getEventColor = (event: Event) => {
   if (event.status === 'completed') {
@@ -77,15 +81,6 @@ const getEventColor = (event: Event) => {
   }
 
   switch(event.priority) {
-    case 'high': return '#f44336';
-    case 'medium': return '#ff9800';
-    case 'low': return '#4caf50';
-    default: return '#2196f3';
-  }
-};
-
-const getPriorityColor = (priority: string) => {
-  switch(priority) {
     case 'high': return '#f44336';
     case 'medium': return '#ff9800';
     case 'low': return '#4caf50';
@@ -132,6 +127,11 @@ const calendarOptions = {
   nowIndicator: true,
 
   dateClick: (info: any) => {
+    const start = info.date;
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+
+    selectedStartDate.value = start;
+    selectedEndDate.value = end;
     selectedEvent.value = null;
     showEventModal.value = true;
   },
@@ -165,6 +165,8 @@ const calendarOptions = {
   },
 
   select: (info: any) => {
+    selectedStartDate.value = info.start;
+    selectedEndDate.value = info.end;
     selectedEvent.value = null;
     showEventModal.value = true;
   }

@@ -57,11 +57,11 @@
                 label="Длительность (мин)"
                 type="number"
                 suffix="мин"
+                @update:model-value="updateDuration"
               />
             </v-col>
           </v-row>
 
-          <!-- Статус задачи -->
           <v-select
             v-if="event"
             v-model="formData.status"
@@ -76,7 +76,6 @@
       <v-card-actions>
         <v-spacer />
 
-        <!-- Кнопка удаления (только для существующих задач) -->
         <v-btn
           v-if="event"
           color="error"
@@ -90,7 +89,6 @@
 
         <v-btn color="grey" @click="close">Отмена</v-btn>
 
-        <!-- Кнопка выполнения (только для невыполненных задач) -->
         <v-btn
           v-if="event && event.status !== 'completed'"
           color="success"
@@ -116,6 +114,8 @@ import type { Event } from '@/types';
 const props = defineProps<{
   visible: boolean;
   event?: Event | null;
+  startDate?: Date | null;
+  endDate?: Date | null;
 }>();
 
 const emit = defineEmits<{
@@ -143,9 +143,7 @@ const statusOptions = [
   { text: 'Выполнено', value: 'completed' }
 ];
 
-const toLocalDateTime = (isoString: string) => {
-  if (!isoString) return '';
-  const date = new Date(isoString);
+const toLocalDateTime = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -172,38 +170,84 @@ const formData = ref({
   status: 'pending' as 'pending' | 'completed'
 });
 
+// Функция для обновления длительности (пересчитывает время окончания)
+const updateDuration = (minutes: number) => {
+  if (!formData.value.start_time) return;
+
+  const start = new Date(formData.value.start_time);
+  const end = new Date(start.getTime() + minutes * 60 * 1000);
+
+  formData.value.end_time = end.toISOString();
+  formData.value.end_time_local = toLocalDateTime(end);
+};
+
 const updateStartTime = (val: string) => {
   formData.value.start_time = fromLocalDateTime(val);
   formData.value.start_time_local = val;
 
-  if (formData.value.end_time && new Date(formData.value.end_time) <= new Date(formData.value.start_time)) {
-    const newEnd = new Date(formData.value.start_time);
-    newEnd.setHours(newEnd.getHours() + 1);
-    formData.value.end_time = newEnd.toISOString();
-    formData.value.end_time_local = toLocalDateTime(formData.value.end_time);
+  // Пересчитываем длительность и время окончания
+  const duration = formData.value.estimated_duration;
+  if (duration && formData.value.start_time) {
+    const start = new Date(formData.value.start_time);
+    const end = new Date(start.getTime() + duration * 60 * 1000);
+    formData.value.end_time = end.toISOString();
+    formData.value.end_time_local = toLocalDateTime(end);
   }
 };
 
 const updateEndTime = (val: string) => {
   formData.value.end_time = fromLocalDateTime(val);
   formData.value.end_time_local = val;
+
+  // Пересчитываем длительность
+  if (formData.value.start_time && formData.value.end_time) {
+    const start = new Date(formData.value.start_time);
+    const end = new Date(formData.value.end_time);
+    const minutes = Math.round((end.getTime() - start.getTime()) / 60000);
+    formData.value.estimated_duration = minutes > 0 ? minutes : 30;
+  }
+};
+
+// Устанавливаем начальные значения из пропсов
+const setDatesFromProps = () => {
+  if (props.startDate && props.endDate) {
+    const start = props.startDate;
+    const end = props.endDate;
+    const duration = Math.round((end.getTime() - start.getTime()) / 60000);
+
+    formData.value.start_time = start.toISOString();
+    formData.value.end_time = end.toISOString();
+    formData.value.start_time_local = toLocalDateTime(start);
+    formData.value.end_time_local = toLocalDateTime(end);
+    formData.value.estimated_duration = duration > 0 ? duration : 30;
+  }
 };
 
 watch(() => props.visible, (val) => {
   dialogVisible.value = val;
   if (val && props.event) {
+    // Редактирование существующей задачи
     formData.value = {
       title: props.event.title,
       description: props.event.description || '',
       start_time: props.event.start_time,
       end_time: props.event.end_time,
-      start_time_local: toLocalDateTime(props.event.start_time),
-      end_time_local: toLocalDateTime(props.event.end_time),
+      start_time_local: toLocalDateTime(new Date(props.event.start_time)),
+      end_time_local: toLocalDateTime(new Date(props.event.end_time)),
       priority: props.event.priority,
       estimated_duration: props.event.estimated_duration || 30,
       status: props.event.status
     };
+  } else if (val && props.startDate && props.endDate) {
+    // Новая задача с выделенными датами
+    setDatesFromProps();
+    // Сбрасываем остальные поля, но сохраняем даты
+    formData.value.title = '';
+    formData.value.description = '';
+    formData.value.priority = 'medium';
+    formData.value.status = 'pending';
   } else if (val) {
+    // Новая задача без выделенных дат (по умолчанию)
     const now = new Date();
     now.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0);
     const start = now;
@@ -214,8 +258,8 @@ watch(() => props.visible, (val) => {
       description: '',
       start_time: start.toISOString(),
       end_time: end.toISOString(),
-      start_time_local: toLocalDateTime(start.toISOString()),
-      end_time_local: toLocalDateTime(end.toISOString()),
+      start_time_local: toLocalDateTime(start),
+      end_time_local: toLocalDateTime(end),
       priority: 'medium',
       estimated_duration: 60,
       status: 'pending'

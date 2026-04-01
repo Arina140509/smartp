@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://planner-backend.onrender.com/api',
+  baseURL: 'https://planner-backend-nblk.onrender.com/api',
   headers: {
     'Content-Type': 'application/json',
   },

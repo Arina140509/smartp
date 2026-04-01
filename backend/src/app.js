@@ -24,7 +24,8 @@ const allowedOrigins = [
 app.use(cors({
   origin: [
     'https://planner-frontend-lpmb.onrender.com',
-    'http://localhost:5174'
+    'http://localhost:5174',
+    'http://localhost:5173'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
